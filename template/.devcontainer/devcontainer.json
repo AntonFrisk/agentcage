@@ -1,0 +1,20 @@
+{
+  // Isolation: the source lives in a Docker volume, NOT a bind mount of a host folder.
+  // The container gets no host paths, no Docker socket and no privileged mode.
+  "name": "${localWorkspaceFolderBasename}",
+  "build": { "dockerfile": "Dockerfile" },
+  "workspaceMount": "source=devbox-${localWorkspaceFolderBasename}-src,target=/workspaces/${localWorkspaceFolderBasename},type=volume",
+  "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
+  "mounts": [
+    // Persists OpenCode logins/sessions, shell history etc. across rebuilds
+    "source=devbox-${localWorkspaceFolderBasename}-home,target=/home/node,type=volume"
+  ],
+  // OpenCode server is published on the host's loopback only (__PORT__/__PASSWORD__ filled in by new-devbox.sh)
+  "runArgs": ["--name=devbox-${localWorkspaceFolderBasename}", "--label=devbox.name=${localWorkspaceFolderBasename}", "-p", "127.0.0.1:__PORT__:4096"],
+  "containerEnv": { "OPENCODE_SERVER_PASSWORD": "__PASSWORD__" },
+  "remoteUser": "node",
+  "init": true,
+  "forwardPorts": [3000],
+  "postCreateCommand": "devbox-post-create",
+  "postStartCommand": "setsid nohup opencode serve --hostname 0.0.0.0 --port 4096 > /tmp/opencode-serve.log 2>&1 &"
+}
