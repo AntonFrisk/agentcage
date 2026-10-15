@@ -51,7 +51,7 @@ export async function registerFlow(b, interactive = true) {
     if (!go) return p.log.info(`Later: agentcage connect ${b.name}`);
   }
   await connectDesktop(b);
-  p.log.success(`OpenCode Desktop: added server "agentcage: ${b.name}" with project ${ws(b)}`);
+  p.log.success(`OpenCode Desktop: added server "ac-${b.name}" with project ${ws(b)}`);
 }
 
 // Hands the terminal to OpenCode's own key prompt for each provider
@@ -78,7 +78,7 @@ export async function newWizard(f = {}) {
   if (!isGitUrl(src) && !existsSync(src)) throw new Error(`Folder not found: ${src}`);
 
   const nameOk = v => (!/^[a-z0-9][a-z0-9-]*$/.test(v ?? '') ? 'Use lowercase letters, digits and -' : nameTaken(v) ? `A container named '${v}' already exists` : undefined);
-  const name = await pick(f.name, cleanName(src), () => ask(p.text({ message: 'Container name', initialValue: cleanName(src), validate: nameOk })));
+  const name = await pick(f.name, cleanName(src), () => ask(p.text({ message: 'Container name (the Docker container and the OpenCode server get the prefix "ac-")', initialValue: cleanName(src), validate: nameOk })));
   if (nameOk(name)) throw new Error(nameOk(name));
 
   // Git push access
@@ -136,7 +136,7 @@ export async function newWizard(f = {}) {
   if (ide !== 'none') { openIde(b, ide); p.log.success('Opening the IDE attached to the container'); }
   p.outro([
     `Container '${name}' is ready.`,
-    oc && `OpenCode Desktop: select "agentcage: ${name}" and start a session. Only sessions on that server are isolated.`,
+    oc && `OpenCode Desktop: select "ac-${name}" and start a session. Only sessions on that server are isolated.`,
     tools.includes('claude-code') && `Claude Code: agentcage shell ${name}, then run claude to log in.`,
     `Shell: agentcage shell ${name}    IDE: agentcage open ${name}`,
   ].filter(Boolean).join('\n'));

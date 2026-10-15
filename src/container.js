@@ -30,9 +30,9 @@ export function saveContainer(b) {
 }
 export const listContainers = () => (existsSync(ROOT) ? readdirSync(ROOT).filter(hasContainer).map(loadContainer) : []);
 
-export const cleanName = s => 'ac-' + s.replace(/\.git\/?$/, '').replace(/[\\/:]+$/, '').replace(/.*[:\\/]/, '')
+export const cleanName = s => s.replace(/\.git\/?$/, '').replace(/[\\/:]+$/, '').replace(/.*[:\\/]/, '')
   .toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
-export const nameTaken = n => hasContainer(n) || ok('docker', ['inspect', n]) || ok('docker', ['volume', 'inspect', `${n}-src`]);
+export const nameTaken = n => hasContainer(n) || ok('docker', ['inspect', `ac-${n}`]) || ok('docker', ['volume', 'inspect', `ac-${n}-src`]);
 
 const bindable = port => new Promise(r => {
   const s = createServer().once('error', () => r(false)).listen(port, '127.0.0.1', () => s.close(() => r(true)));
@@ -74,8 +74,8 @@ export const state = b => runSync('docker', ['inspect', '-f', '{{.State.Status}}
 export async function createContainer(o, step = (_, f) => f()) {
   const { name } = o, src = isGitUrl(o.src) ? o.src : resolve(o.src);
   const b = {
-    name, dir: join(ROOT, name), container: name,
-    volumes: { src: `${name}-src`, home: `${name}-home` },
+    name, dir: join(ROOT, name), container: `ac-${name}`,
+    volumes: { src: `ac-${name}-src`, home: `ac-${name}-home` },
     port: await freePort(), password: randomBytes(16).toString('hex'),
     source: src, git: o.git, tools: o.tools, opencodeVersion: o.opencodeVersion, created: new Date().toISOString(),
   };

@@ -43,7 +43,7 @@ export async function connectDesktop(container) {
   const row = d.prepare("select value from state where name='opencode.global.dat' and key='server'").get();
   const s = { list: [], hidden: {}, projects: {}, lastProject: {}, recentlyClosed: {}, ...(row && JSON.parse(row.value)) };
   const urlOf = x => (typeof x === 'string' ? x : x.http?.url ?? x.url);
-  s.list = s.list.filter(x => urlOf(x) !== url).concat({ type: 'http', http: { url, password: container.password }, displayName: `agentcage: ${container.name}` });
+  s.list = s.list.filter(x => urlOf(x) !== url).concat({ type: 'http', http: { url, password: container.password }, displayName: `ac-${container.name}` });
   s.projects[url] = [{ worktree: dir, expanded: true }];
   s.lastProject[url] = dir;
   d.prepare(`insert into state(name, key, value, updated_at) values ('opencode.global.dat', 'server', ?, ?)

@@ -31,7 +31,7 @@ Run `agentcage` and follow the dialog. It asks for:
    API key in your terminal.
 7. **An IDE** to open the container in when it's ready (Cursor, VS Code, Antigravity).
 
-Then it builds the container, adds it to OpenCode Desktop as server **agentcage: &lt;name&gt;** with the project
+Then it builds the container, adds it to OpenCode Desktop as server **ac-&lt;name&gt;** with the project
 `/workspaces/<name>` already open, and opens the IDE.
 
 The same works without the dialog:

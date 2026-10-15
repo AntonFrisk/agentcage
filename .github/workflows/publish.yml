@@ -1,4 +1,5 @@
-# Publishes to npm on push to main when package.json has a version that isn't on npm yet.
+# Publishes a new patch version to npm on every push to main (patch bump: 0.1.0 -> 0.1.1).
+# The version is the latest on npm with the patch bumped (or package.json's if that is higher), set only in CI, not committed.
 # Auth: npm trusted publishing (OIDC), so no NPM_TOKEN secret is needed.
 name: Publish to npm
 on:
@@ -7,6 +8,7 @@ on:
 permissions:
   contents: read
   id-token: write
+concurrency: publish
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -18,10 +20,9 @@ jobs:
           registry-url: https://registry.npmjs.org
       - run: npm ci
       - run: for f in bin/*.js src/*.js; do node --check "$f"; done
-      - name: Skip if this version is already published
-        id: check
+      - name: Bump patch version
         run: |
-          V=$(node -p "require('./package.json').version")
-          if npm view "agentcage@$V" version >/dev/null 2>&1; then echo "agentcage@$V already published"; echo "skip=true" >> "$GITHUB_OUTPUT"; fi
-      - if: steps.check.outputs.skip != 'true'
-        run: npm publish --access public
+          LATEST=$(npm view agentcage version 2>/dev/null || echo 0.0.0)
+          V=$(node -p "const [a,b,c]='$LATEST'.split('.').map(Number), next=[a,b,c+1], own=require('./package.json').version.split('.').map(Number); (own[0]-next[0]||own[1]-next[1]||own[2]-next[2]) > 0 ? own.join('.') : next.join('.')")
+          npm version "$V" --no-git-tag-version
+      - run: npm publish --access public
