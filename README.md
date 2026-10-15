@@ -1,5 +1,12 @@
 # agentcage
 
+```
+ ▄▄▄ ▄▄▄▄ ▄▄▄▄ ▄▄▄▄  █   ▄▄▄▄  ▄▄▄ ▄▄▄▄ ▄▄▄▄
+▄▄▄█ █  █ █▄▄▄ █  █ ▀█▀  █    ▄▄▄█ █  █ █▄▄▄
+█▄▄█ ▀▀▀█ █▄▄▄ █  █  █▄▄ █▄▄▄ █▄▄█ ▀▀▀█ █▄▄▄
+     ▀▀▀▀                          ▀▀▀▀
+```
+
 Isolated dev containers for AI coding agents. Each project gets its own Linux container. **The project source lives
 in a Docker volume, not in a folder mounted from your laptop**, so agents in the container can't see your other files. Each container can
 run an **OpenCode server** that the OpenCode Desktop app on your laptop connects to. The app is only the UI: every agent tool
