@@ -1,9 +1,9 @@
-// Interactive dialogs (@clack/prompts) on top of the box functions. Flags pre-fill answers; --yes takes defaults.
+// Interactive dialogs (@clack/prompts) on top of the container functions. Flags pre-fill answers; --yes takes defaults.
 import * as p from '@clack/prompts';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { AGENTS, DEV_TOOLS, PROVIDERS, hostInfo } from './catalog.js';
-import { cleanName, createBox, nameTaken, openIde, ws } from './box.js';
+import { cleanName, createContainer, nameTaken, openIde, ws } from './container.js';
 import { isGitUrl, localRemote, parseRemote } from './git.js';
 import { connectDesktop, desktopRunning, detectDesktop, latestVersion, loginProvider } from './opencode.js';
 import { ok, runSync } from './run.js';
@@ -22,10 +22,10 @@ const step = async (label, fn) => {
 export const connectionInfo = b =>
   `Server    http://127.0.0.1:${b.port}\nUsername  opencode\nPassword  ${b.password}\nDirectory ${ws(b)}`;
 
-const FORWARD_WARNING = `While Cursor or VS Code is attached to the box, your laptop's git credentials
-and SSH agent are forwarded into the container. Any agent running in the box at
+const FORWARD_WARNING = `While Cursor or VS Code is attached to the container, your laptop's git credentials
+and SSH agent are forwarded into the container. Any agent running in the container at
 that time can use them to push to EVERY repository you have access to, not only
-this one. When no IDE is attached, the box cannot push at all.`;
+this one. When no IDE is attached, the container cannot push at all.`;
 
 // IDEs that can attach to a container, found on PATH or in their usual install folder
 function findIdes() {
@@ -42,12 +42,12 @@ async function waitForDocker() {
   }
 }
 
-// Registers the box in OpenCode Desktop, asking the user to close the app if needed
+// Registers the container in OpenCode Desktop, asking the user to close the app if needed
 export async function registerFlow(b, interactive = true) {
   if (!detectDesktop().hasDb) return p.note(connectionInfo(b), 'OpenCode Desktop not found. Add this server by hand');
   while (desktopRunning()) {
     if (!interactive) return p.log.warn(`OpenCode Desktop is open. Close it, then run: agentcage connect ${b.name}`);
-    const go = await ask(p.confirm({ message: 'Close OpenCode Desktop so the box can be added to it.', active: 'It is closed now', inactive: 'Skip for now' }));
+    const go = await ask(p.confirm({ message: 'Close OpenCode Desktop so the container can be added to it.', active: 'It is closed now', inactive: 'Skip for now' }));
     if (!go) return p.log.info(`Later: agentcage connect ${b.name}`);
   }
   await connectDesktop(b);
@@ -56,7 +56,7 @@ export async function registerFlow(b, interactive = true) {
 
 // Hands the terminal to OpenCode's own key prompt for each provider
 export async function providerFlow(b, ids) {
-  ids ??= await ask(p.multiselect({ message: 'Which providers should OpenCode use in this box?', options: PROVIDERS.map(x => ({ value: x.id, label: x.label, hint: x.hint })) }));
+  ids ??= await ask(p.multiselect({ message: 'Which providers should OpenCode use in this container?', options: PROVIDERS.map(x => ({ value: x.id, label: x.label, hint: x.hint })) }));
   for (const id of ids) {
     const pr = PROVIDERS.find(x => x.id === id);
     p.log.step(`${pr.label}: paste your API key when OpenCode asks for it (get one at ${pr.hint}).`);
@@ -66,7 +66,7 @@ export async function providerFlow(b, ids) {
 
 export async function newWizard(f = {}) {
   const pick = (flag, def, prompt) => (flag !== undefined ? flag : f.yes ? def : prompt());
-  p.intro('agentcage · new box');
+  p.intro('agentcage · new container');
   await waitForDocker();
 
   const src = f.src ?? await ask((await ask(p.select({ message: 'Where is the project?', options: [
@@ -77,15 +77,15 @@ export async function newWizard(f = {}) {
     : p.text({ message: 'Repository URL', placeholder: 'https://github.com/owner/repo.git', validate: v => (isGitUrl(v ?? '') ? undefined : 'Enter an https:// or git@ URL') }));
   if (!isGitUrl(src) && !existsSync(src)) throw new Error(`Folder not found: ${src}`);
 
-  const nameOk = v => (!/^[a-z0-9][a-z0-9-]*$/.test(v ?? '') ? 'Use lowercase letters, digits and -' : nameTaken(v) ? `A box named '${v}' already exists` : undefined);
-  const name = await pick(f.name, cleanName(src), () => ask(p.text({ message: 'Box name', initialValue: cleanName(src), validate: nameOk })));
+  const nameOk = v => (!/^[a-z0-9][a-z0-9-]*$/.test(v ?? '') ? 'Use lowercase letters, digits and -' : nameTaken(v) ? `A container named '${v}' already exists` : undefined);
+  const name = await pick(f.name, cleanName(src), () => ask(p.text({ message: 'Container name', initialValue: cleanName(src), validate: nameOk })));
   if (nameOk(name)) throw new Error(nameOk(name));
 
   // Git push access
   const remoteUrl = isGitUrl(src) ? src : localRemote(src), remote = parseRemote(remoteUrl);
   let git = 'none', token;
   if (remote) {
-    git = await pick(f.git, 'forward', () => ask(p.select({ message: `How should the box push to ${remote.host}/${remote.path}?`, options: [
+    git = await pick(f.git, 'forward', () => ask(p.select({ message: `How should the container push to ${remote.host}/${remote.path}?`, options: [
       { value: 'token', label: 'A token for this repo only', hint: 'recommended: agents can only push here' },
       { value: 'forward', label: "Skip: use my IDE's forwarded credentials", hint: 'access to all your repos while the IDE is attached' },
     ] })));
@@ -107,13 +107,13 @@ export async function newWizard(f = {}) {
   let opencodeVersion, providers = [];
   if (oc) {
     const d = detectDesktop();
-    opencodeVersion = d.version ?? await pick(undefined, await latestVersion(), async () => ask(p.text({ message: 'OpenCode Desktop not found. OpenCode version for the box', initialValue: await latestVersion() })));
+    opencodeVersion = d.version ?? await pick(undefined, await latestVersion(), async () => ask(p.text({ message: 'OpenCode Desktop not found. OpenCode version for the container', initialValue: await latestVersion() })));
     if (d.version) p.log.info(`OpenCode ${d.version} (matches your Desktop app)`);
-    providers = await pick(f.providers, [], () => ask(p.multiselect({ message: 'Model providers to connect (you paste each API key after the build)', options: PROVIDERS.map(x => ({ value: x.id, label: x.label, hint: x.hint })), required: false })));
+    providers = await pick(f.providers, [], () => ask(p.multiselect({ message: 'Additional OpenCode model providers to connect (you paste each API key after the build)', options: PROVIDERS.map(x => ({ value: x.id, label: x.label, hint: x.hint })), required: false })));
   }
 
   const ides = findIdes();
-  const ide = await pick(f.ide, 'none', () => ides.length ? ask(p.select({ message: 'Open the box in an IDE when done?', options: [...ides, { value: 'none', label: 'No' }] })) : 'none');
+  const ide = await pick(f.ide, 'none', () => ides.length ? ask(p.select({ message: 'Open the container in an IDE when done?', options: [...ides, { value: 'none', label: 'No' }] })) : 'none');
 
   p.note([
     `Source     ${src}`, `Name       ${name}`,
@@ -121,21 +121,21 @@ export async function newWizard(f = {}) {
     `Tools      ${tools.join(', ') || 'none'}${oc ? ` (OpenCode ${opencodeVersion})` : ''}`,
     ...(providers.length ? [`Providers  ${providers.join(', ')}`] : []),
   ].join('\n'), 'Summary');
-  if (!f.yes && !(await ask(p.confirm({ message: 'Create the box?' })))) return p.cancel('Nothing created.');
+  if (!f.yes && !(await ask(p.confirm({ message: 'Create the container?' })))) return p.cancel('Nothing created.');
 
   let b;
   try {
-    b = await createBox({ src, name, tools, git, token, remote: remoteUrl, opencodeVersion }, step);
+    b = await createContainer({ src, name, tools, git, token, remote: remoteUrl, opencodeVersion }, step);
   } catch (e) {
     p.log.error(e.message);
-    p.outro(`Box creation failed. Fix the problem, then clean up with: agentcage remove ${name}`);
+    p.outro(`Container creation failed. Fix the problem, then clean up with: agentcage remove ${name}`);
     process.exit(1);
   }
   if (providers.length) await providerFlow(b, providers);
   if (oc) await registerFlow(b, !f.yes);
-  if (ide !== 'none') { openIde(b, ide); p.log.success('Opening the IDE attached to the box'); }
+  if (ide !== 'none') { openIde(b, ide); p.log.success('Opening the IDE attached to the container'); }
   p.outro([
-    `Box '${name}' is ready.`,
+    `Container '${name}' is ready.`,
     oc && `OpenCode Desktop: select "agentcage: ${name}" and start a session. Only sessions on that server are isolated.`,
     tools.includes('claude-code') && `Claude Code: agentcage shell ${name}, then run claude to log in.`,
     `Shell: agentcage shell ${name}    IDE: agentcage open ${name}`,

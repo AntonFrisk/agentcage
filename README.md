@@ -1,9 +1,9 @@
 # agentcage
 
-Isolated dev containers for AI coding agents. Each project gets its own Linux container ("box"). **The project source lives
-in a Docker volume, not in a folder mounted from your laptop**, so agents in the box can't see your other files. Each box can
+Isolated dev containers for AI coding agents. Each project gets its own Linux container. **The project source lives
+in a Docker volume, not in a folder mounted from your laptop**, so agents in the container can't see your other files. Each container can
 run an **OpenCode server** that the OpenCode Desktop app on your laptop connects to. The app is only the UI: every agent tool
-call (bash, read, edit) runs in the box. Claude Code can be installed in the box too.
+call (bash, read, edit) runs in the container. Claude Code can be installed in the container too.
 
 Works on Windows, macOS and Linux, in any terminal (PowerShell, Terminal, bash).
 
@@ -17,21 +17,21 @@ npm install -g agentcage
 agentcage doctor        # checks everything above
 ```
 
-## Create a box
+## Create a container
 
 Run `agentcage` and follow the dialog. It asks for:
 
 1. **Where the project is:** a folder on this computer (copied once, including untracked files such as `.env.local`)
    or a git URL (cloned).
-2. **A name** for the box.
+2. **A name** for the container.
 3. **Git push access** (if the project has a remote). See [Git push access](#git-push-access).
 4. **AI agents:** OpenCode (on by default) and/or Claude Code.
 5. **Extra dev tools:** Python, GitHub CLI, pnpm. Node 24 and uv are always included.
 6. **Model providers for OpenCode** (Anthropic, OpenAI, OpenRouter, Google, Groq). After the build, OpenCode asks for each
    API key in your terminal.
-7. **An IDE** to open the box in when it's ready (Cursor, VS Code, Antigravity).
+7. **An IDE** to open the container in when it's ready (Cursor, VS Code, Antigravity).
 
-Then it builds the box, adds it to OpenCode Desktop as server **agentcage: &lt;name&gt;** with the project
+Then it builds the container, adds it to OpenCode Desktop as server **agentcage: &lt;name&gt;** with the project
 `/workspaces/<name>` already open, and opens the IDE.
 
 The same works without the dialog:
@@ -44,53 +44,53 @@ AGENTCAGE_GIT_TOKEN=github_pat_... agentcage new https://github.com/me/repo.git 
 ## Commands
 
 ```bash
-agentcage                       # menu: create a box, or start/open/shell/upgrade/remove an existing one
-agentcage list                  # boxes, state, port, OpenCode version
+agentcage                       # menu: create a container, or start/open/shell/upgrade/remove an existing one
+agentcage list                  # containers, state, port, OpenCode version
 agentcage start <name>          # start after a reboot, print the OpenCode server URL and password
-agentcage shell <name>          # shell in the box (opencode, claude, git ... work here)
-agentcage open <name> [ide]     # Cursor (default), VS Code, or another VS Code-based IDE attached to the box
-agentcage provider <name>       # add model provider API keys to OpenCode in the box
-agentcage connect <name>        # (re)register the box in OpenCode Desktop
+agentcage shell <name>          # shell in the container (opencode, claude, git ... work here)
+agentcage open <name> [ide]     # Cursor (default), VS Code, or another VS Code-based IDE attached to the container
+agentcage provider <name>       # add model provider API keys to OpenCode in the container
+agentcage connect <name>        # (re)register the container in OpenCode Desktop
 agentcage upgrade <name>        # rebuild with the Desktop app's OpenCode version (volumes kept)
 agentcage stop <name>
 agentcage remove <name>         # delete container, volumes and config
 agentcage doctor
-agentcage adopt <name>          # import a box made by the old bash scripts in legacy/
+agentcage adopt <name>          # import a container made by the old bash scripts in legacy/
 ```
 
-Box config lives in `~/.agentcage/<name>/` (`box.json` and the generated `.devcontainer/`). `node_modules`, `.venv` and
-`.next` are not copied. Instead the box runs `npm ci` / `uv sync` for every lockfile it finds.
+Container config lives in `~/.agentcage/<name>/` (`container.json` and the generated `.devcontainer/`). `node_modules`, `.venv` and
+`.next` are not copied. Instead the container runs `npm ci` / `uv sync` for every lockfile it finds.
 
 ## Git push access
 
-The copy in the box is separate from your laptop's, so changes leave the box via **git push**. The dialog offers two ways:
+The copy in the container is separate from your laptop's, so changes leave the container via **git push**. The dialog offers two ways:
 
 - **A token for this repo only (recommended).** The dialog shows how to create one: a fine-grained GitHub token limited to
   the repo with *Contents: read and write*, a GitLab project access token, or a Bitbucket repository access token. The token
-  is stored with git's credential store in the box's home volume and used for this repo only. The repo's git config clears
+  is stored with git's credential store in the container's home volume and used for this repo only. The repo's git config clears
   any other credential helper, including the one an attached IDE forwards.
   Cursor and VS Code still forward your **SSH agent**. To close that path too, set
   `"dev.containers.copyGitConfig": false` and `"dev.containers.gitCredentialHelperConfigLocation": "none"` in the IDE's
   settings and turn off SSH agent forwarding.
 - **Skip: use your IDE's forwarded credentials.** While Cursor or VS Code is attached, your laptop's git credentials and
-  SSH agent are forwarded into the box, so pushing from the IDE just works. **While the IDE is attached, any agent in the
-  box can use them to push to every repository you have access to.** When no IDE is attached, the box can't push at all.
+  SSH agent are forwarded into the container, so pushing from the IDE just works. **While the IDE is attached, any agent in the
+  container can use them to push to every repository you have access to.** When no IDE is attached, the container can't push at all.
 
 For a git URL, token mode clones inside a throwaway container with the token. Forward mode clones on your laptop with your
-own git credentials, then copies the repo in. Both work with private repos. Your git name and email are copied into the box.
+own git credentials, then copies the repo in. Both work with private repos. Your git name and email are copied into the container.
 
 ## OpenCode Desktop
 
 agentcage reads the Desktop app's version (from `opencode-cli.version` in its install folder) and installs the same OpenCode
-version in the box, because Desktop only talks to matching servers. `list`, `start` and `doctor` warn when the app has
-updated since; `agentcage upgrade <name>` rebuilds the box with the new version and keeps your code, logins and sessions.
+version in the container, because Desktop only talks to matching servers. `list`, `start` and `doctor` warn when the app has
+updated since; `agentcage upgrade <name>` rebuilds the container with the new version and keeps your code, logins and sessions.
 
 Desktop has no API or deep link for adding a server, so agentcage writes the app's own state DB (`drafts.sqlite` in the
 app's data folder, backed up as `drafts.sqlite.agentcage-backup`). **The app must be closed for this.** The dialog asks you
 to close it. This relies on the app's internal storage format (written against Desktop 2.0.23), so a future app update may
 break it. `agentcage start <name>` always prints the URL, username and password for adding the server by hand.
 
-Provider API keys are typed into OpenCode's own prompt inside the box. They are stored only in the box's home volume,
+Provider API keys are typed into OpenCode's own prompt inside the container. They are stored only in the container's home volume,
 never on your laptop, and survive rebuilds.
 
 ⚠️ Only sessions on the **agentcage server** are isolated. Sessions on the app's built-in **Local** server run on your laptop.
@@ -99,11 +99,11 @@ never on your laptop, and survive rebuilds.
 
 - ✅ No host folders mounted, no Docker socket, not privileged. The OpenCode server is published only on `127.0.0.1` and
   requires a random password.
-- ⚠️ The box has internet access and can reach services on your laptop via `host.docker.internal`.
+- ⚠️ The container has internet access and can reach services on your laptop via `host.docker.internal`.
 - ⚠️ Secrets you copy in (for example `.env.local`) and provider keys can be read by agents. Use dev and test keys.
 - ⚠️ An attached IDE forwards your SSH agent, and in forward mode your git credentials (see above).
-- ⚠️ Use the IDE for editing, diffs and git. Its built-in AI agent runs outside the box's isolation, so run agents through
-  OpenCode or Claude Code in the box.
+- ⚠️ Use the IDE for editing, diffs and git. Its built-in AI agent runs outside the container's isolation, so run agents through
+  OpenCode or Claude Code in the container.
 
 ## Platform notes
 
@@ -144,11 +144,11 @@ The setup dialog should let the user choose the backend: **plain Docker containe
    Windows 11 with Hypervisor Platform.
 6. OpenCode API keys: `opencode auth login` only accepts keys interactively, but with `sbx secret` this is not needed.
 
-**Plan:** add a `backend: docker | sbx` choice to the dialog and `box.json`. The `sbx` backend maps our steps to
+**Plan:** add a `backend: docker | sbx` choice to the dialog and `container.json`. The `sbx` backend maps our steps to
 `sbx create --clone -p 127.0.0.1:<port>:4096 opencode <repo>`, `sbx secret set <provider|github> --sandbox <name>`, and
 an OpenCode kit that pins the Desktop version and starts `opencode serve` at boot. The wizard, version detection and Desktop
 registration stay the same.
 
 ## Legacy
 
-`legacy/` holds the original bash scripts this tool replaces. `agentcage adopt <name>` takes over a box they created.
+`legacy/` holds the original bash scripts this tool replaces. `agentcage adopt <name>` takes over a container they created.

@@ -1,4 +1,4 @@
-// Getting the source into the box, and git push credentials inside it.
+// Getting the source into the container, and git push credentials inside it.
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -43,7 +43,7 @@ export async function copyIdentity(container) {
   }
 }
 
-// Repo-scoped token: stored with git's credential store in the box's home volume, used for this repo only.
+// Repo-scoped token: stored with git's credential store in the container's home volume, used for this repo only.
 // The empty credential.helper entry clears helpers set earlier (such as the one an attached IDE forwards).
 const TOKEN_SETUP = `IFS= read -r T; umask 077
 printf 'https://%s:%s@%s/%s.git\\n' "$1" "$T" "$2" "$3" > ~/.git-credentials

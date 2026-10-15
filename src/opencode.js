@@ -1,4 +1,4 @@
-// OpenCode Desktop on the host: where it lives, its version, whether it runs, and registering boxes in it.
+// OpenCode Desktop on the host: where it lives, its version, whether it runs, and registering containers in it.
 import { copyFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -33,17 +33,17 @@ export const desktopRunning = () => P === 'win32'
 export const latestVersion = async () => (await (await fetch('https://registry.npmjs.org/@opencode/cli/latest')).json()).version;
 
 // Desktop has no API or deep link for adding a server, so write its state DB (app must be closed). A backup is kept.
-export async function connectDesktop(box) {
+export async function connectDesktop(container) {
   const { db, hasDb } = detectDesktop();
   if (!hasDb) throw new Error(`OpenCode Desktop state not found at ${db}. Open the app once first.`);
   if (desktopRunning()) throw new Error('OpenCode Desktop is running. Close it first.');
   copyFileSync(db, db + '.agentcage-backup');
   const { DatabaseSync } = await import('node:sqlite');
-  const d = new DatabaseSync(db), url = `http://127.0.0.1:${box.port}`, dir = `/workspaces/${box.name}`;
+  const d = new DatabaseSync(db), url = `http://127.0.0.1:${container.port}`, dir = `/workspaces/${container.name}`;
   const row = d.prepare("select value from state where name='opencode.global.dat' and key='server'").get();
   const s = { list: [], hidden: {}, projects: {}, lastProject: {}, recentlyClosed: {}, ...(row && JSON.parse(row.value)) };
   const urlOf = x => (typeof x === 'string' ? x : x.http?.url ?? x.url);
-  s.list = s.list.filter(x => urlOf(x) !== url).concat({ type: 'http', http: { url, password: box.password }, displayName: `agentcage: ${box.name}` });
+  s.list = s.list.filter(x => urlOf(x) !== url).concat({ type: 'http', http: { url, password: container.password }, displayName: `agentcage: ${container.name}` });
   s.projects[url] = [{ worktree: dir, expanded: true }];
   s.lastProject[url] = dir;
   d.prepare(`insert into state(name, key, value, updated_at) values ('opencode.global.dat', 'server', ?, ?)
@@ -51,7 +51,7 @@ export async function connectDesktop(box) {
   d.close();
 }
 
-// OpenCode only reads API keys from an interactive terminal, so hand the terminal to its own prompt inside the box.
-// The key goes straight into the box's home volume and never passes through agentcage or the host.
-export const loginProvider = (box, provider) =>
-  run('docker', ['exec', '-it', '-u', 'node', '-w', '/tmp', box.container, 'opencode', 'auth', 'login', provider, '--method', 'key'], { tty: true });
+// OpenCode only reads API keys from an interactive terminal, so hand the terminal to its own prompt inside the container.
+// The key goes straight into the container's home volume and never passes through agentcage or the host.
+export const loginProvider = (container, provider) =>
+  run('docker', ['exec', '-it', '-u', 'node', '-w', '/tmp', container.container, 'opencode', 'auth', 'login', provider, '--method', 'key'], { tty: true });
