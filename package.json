@@ -1,0 +1,16 @@
+{
+  "name": "agentcage",
+  "version": "0.1.0",
+  "description": "Isolated dev containers for AI coding agents (OpenCode, Claude Code), connected to OpenCode Desktop",
+  "type": "module",
+  "bin": { "agentcage": "bin/agentcage.js" },
+  "files": ["bin", "src", "template"],
+  "engines": { "node": ">=22.13" },
+  "keywords": ["devcontainer", "opencode", "claude-code", "ai-agents", "sandbox", "docker"],
+  "author": "Anton Frisk",
+  "license": "MIT",
+  "dependencies": {
+    "@clack/prompts": "^1.8.1",
+    "@devcontainers/cli": "^0.89.0"
+  }
+}
