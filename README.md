@@ -1,10 +1,10 @@
 # agentcage
 
 ```
- ▄▄▄ ▄▄▄▄ ▄▄▄▄ ▄▄▄▄  █   ▄ ▄   ▄ ▄ ▄ ▄   ▄ ▄
-▄▄▄█ █  █ █▄▄▄ █  █ ▀█▀  ▄     ▄ ▄ ▄  ▀ ▀▄ ▄
-█▄▄█ ▀▀▀█ █▄▄▄ █  █  █▄▄ ▄ ▄  ▀▄ ▄  ▀ ▀ ▀▄ ▄
-     ▀▀▀▀                           ▀ ▀
+ ▄▄▄ ▄▄▄▄ ▄▄▄▄ ▄▄▄▄  █   ▄▄▄▄  ▄▄▄ ▄▄▄▄ ▄▄▄▄
+▄▄▄█ █  █ █▄▄▄ █  █ ▀█▀  █    ▄▄▄█ █  █ █▄▄▄
+█▄▄█ ▀▀▀█ █▄▄▄ █  █  █▄▄ █▄▄▄ █▄▄█ ▀▀▀█ █▄▄▄
+     ▀▀▀▀                          ▀▀▀▀
 ```
 
 Isolated dev containers for AI coding agents. Each project gets its own Linux container. **The project source lives
