@@ -13,7 +13,7 @@ You need **Docker** (Docker Desktop on Windows/macOS, Docker Engine on Linux), *
 **OpenCode Desktop** (open it once so its settings exist).
 
 ```bash
-npm install -g agentcage
+npm install -g agentcage           # also updates to the latest version
 agentcage doctor        # checks everything above
 ```
 
@@ -54,6 +54,7 @@ agentcage connect <name>        # (re)register the container in OpenCode Desktop
 agentcage upgrade <name>        # rebuild with the Desktop app's OpenCode version (volumes kept)
 agentcage stop <name>
 agentcage remove <name>         # delete container, volumes and config
+agentcage version               # installed version and the latest on npm
 agentcage doctor
 agentcage adopt <name>          # import a container made by the old bash scripts in legacy/
 ```

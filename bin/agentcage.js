@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import * as p from '@clack/prompts';
 import { adoptContainer, listContainers, loadContainer, removeContainer, saveContainer, state, up, writeDevcontainer, openIde, ws } from '../src/container.js';
@@ -22,6 +23,7 @@ const HELP = `agentcage: isolated dev containers for AI coding agents
   agentcage provider <name>         add model provider API keys to OpenCode in the container
   agentcage upgrade <name>          rebuild with the Desktop app's OpenCode version (volumes kept)
   agentcage remove <name>           delete container, volumes and config
+  agentcage version                 installed version, and the latest on npm (update: npm i -g agentcage@latest)
   agentcage doctor                  check Docker, Node and OpenCode Desktop
   agentcage adopt <name>            import a container made by the old devbox bash scripts
 
@@ -30,7 +32,7 @@ const HELP = `agentcage: isolated dev containers for AI coding agents
 let { values: f, positionals: [cmd, arg, arg2] } = parseArgs({
   allowPositionals: true,
   options: { name: { type: 'string' }, tools: { type: 'string' }, git: { type: 'string' }, providers: { type: 'string' },
-    ide: { type: 'string' }, yes: { type: 'boolean', short: 'y' }, help: { type: 'boolean', short: 'h' } },
+    ide: { type: 'string' }, yes: { type: 'boolean', short: 'y' }, help: { type: 'boolean', short: 'h' }, version: { type: 'boolean', short: 'v' } },
 });
 const csv = s => s?.split(',').map(x => x.trim()).filter(Boolean);
 const container = () => loadContainer(arg ?? (() => { throw new Error(`Usage: agentcage ${cmd} <name>`); })());
@@ -47,6 +49,11 @@ async function start(b) {
 }
 
 const commands = {
+  async version() {
+    const v = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
+    const latest = await fetch('https://registry.npmjs.org/agentcage/latest').then(r => r.json()).then(j => j.version, () => undefined);
+    console.log(`agentcage ${v}${!latest ? '' : latest === v ? ' (latest)' : `\nNewer version ${latest} on npm. Update with: npm i -g agentcage@latest`}`);
+  },
   async new() { await newWizard({ src: arg, name: f.name, tools: csv(f.tools), git: f.git, providers: csv(f.providers), ide: f.ide, yes: f.yes }); },
   list() {
     const rows = listContainers().map(b => [b.name, state(b), b.tools.includes('opencode') ? String(b.port) : '-', b.opencodeVersion ?? '-', b.git]);
@@ -109,6 +116,7 @@ const commands = {
   },
 };
 
+if (f.version) cmd = 'version';
 if (f.help || cmd === 'help') console.log(HELP);
 else if (cmd && !commands[cmd]) { console.error(`Unknown command '${cmd}'.\n\n${HELP}`); process.exit(1); }
 else await Promise.resolve().then(() => commands[cmd ?? 'menu']()).catch(e => { p.log.error(e.message); process.exit(1); });
