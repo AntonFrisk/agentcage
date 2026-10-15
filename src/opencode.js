@@ -3,6 +3,7 @@ import { copyFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { ok, run, runSync } from './run.js';
+import { loadSettings } from './settings.js';
 
 const P = process.platform, H = homedir(), E = process.env;
 const DATA_DIR = P === 'win32' ? join(E.APPDATA ?? '', 'ai.opencode.desktop')
@@ -43,12 +44,31 @@ export async function connectDesktop(container) {
   const row = d.prepare("select value from state where name='opencode.global.dat' and key='server'").get();
   const s = { list: [], hidden: {}, projects: {}, lastProject: {}, recentlyClosed: {}, ...(row && JSON.parse(row.value)) };
   const urlOf = x => (typeof x === 'string' ? x : x.http?.url ?? x.url);
-  s.list = s.list.filter(x => urlOf(x) !== url).concat({ type: 'http', http: { url, password: container.password }, displayName: `ac-${container.name}` });
+  s.list = s.list.filter(x => urlOf(x) !== url).concat({ type: 'http', http: { url, password: container.password }, displayName: serverName(container) });
   s.projects[url] = [{ worktree: dir, expanded: true }];
   s.lastProject[url] = dir;
   d.prepare(`insert into state(name, key, value, updated_at) values ('opencode.global.dat', 'server', ?, ?)
     on conflict(name, key) do update set value = excluded.value, updated_at = excluded.updated_at`).run(JSON.stringify(s), Date.now());
   d.close();
+}
+
+// Names stored at creation; containers made before the settings existed use the current settings
+export const serverName = c => c.serverName ?? loadSettings().serverPrefix + c.name;
+
+// Sets the project's name and icon color in the container's OpenCode server. Asking about the folder creates the project first.
+// The server starts in the background after `devcontainer up`, so retry for ~30 s.
+export async function setupProject(c) {
+  const s = loadSettings(), name = c.projectName ?? s.projectPrefix + c.name, color = c.color ?? s.color;
+  const base = `http://127.0.0.1:${c.port}/api`, dir = `/workspaces/${c.name}`;
+  const api = (path, init) => fetch(base + path, { ...init, headers: { authorization: `Basic ${Buffer.from(`opencode:${c.password}`).toString('base64')}`, 'content-type': 'application/json' } })
+    .then(r => (r.ok ? r.json() : Promise.reject(new Error(`OpenCode API ${path}: HTTP ${r.status}`))));
+  for (let i = 0; ; i++) {
+    try {
+      await api(`/vcs?location[directory]=${encodeURIComponent(dir)}`);
+      const { id } = (await api('/project')).find(x => x.canonical === dir);
+      return await api(`/project/${id}`, { method: 'PATCH', body: JSON.stringify({ name, icon: { color } }) });
+    } catch (e) { if (i >= 15) throw e; await new Promise(r => setTimeout(r, 2000)); }
+  }
 }
 
 // OpenCode only reads API keys from an interactive terminal, so hand the terminal to its own prompt inside the container.

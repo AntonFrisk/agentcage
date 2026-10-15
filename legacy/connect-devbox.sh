@@ -23,10 +23,10 @@ const d = new DatabaseSync(db);
 const row = d.prepare("select value from state where name='opencode.global.dat' and key='server'").get();
 const s = { list: [], hidden: {}, projects: {}, lastProject: {}, recentlyClosed: {}, ...(row && JSON.parse(row.value)) };
 const urlOf = x => typeof x === 'string' ? x : x.http?.url ?? x.url;
-s.list = s.list.filter(x => urlOf(x) !== url).concat({ type: 'http', http: { url, password }, displayName: `devbox: ${name}` });
+s.list = s.list.filter(x => urlOf(x) !== url).concat({ type: 'http', http: { url, password }, displayName: `ac-${name}` });
 s.projects[url] = [{ worktree: dir, expanded: true }];
 s.lastProject[url] = dir;
 d.prepare(`insert into state(name, key, value, updated_at) values ('opencode.global.dat', 'server', ?, ?)
   on conflict(name, key) do update set value = excluded.value, updated_at = excluded.updated_at`).run(JSON.stringify(s), Date.now());
 JS
-echo "OpenCode Desktop: added server 'devbox: $NAME' ($URL) with project /workspaces/$NAME"
+echo "OpenCode Desktop: added server 'ac-$NAME' ($URL) with project /workspaces/$NAME"

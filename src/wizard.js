@@ -5,8 +5,9 @@ import { join } from 'node:path';
 import { AGENTS, DEV_TOOLS, PROVIDERS, hostInfo } from './catalog.js';
 import { cleanName, createContainer, nameTaken, openIde, ws } from './container.js';
 import { isGitUrl, localRemote, parseRemote } from './git.js';
-import { connectDesktop, desktopRunning, detectDesktop, latestVersion, loginProvider } from './opencode.js';
+import { connectDesktop, desktopRunning, detectDesktop, latestVersion, loginProvider, serverName, setupProject } from './opencode.js';
 import { ok, runSync } from './run.js';
+import { COLORS, DEFAULTS, LABELS, loadSettings, saveSettings } from './settings.js';
 
 export const ask = async q => {
   const v = await q;
@@ -51,7 +52,7 @@ export async function registerFlow(b, interactive = true) {
     if (!go) return p.log.info(`Later: agentcage connect ${b.name}`);
   }
   await connectDesktop(b);
-  p.log.success(`OpenCode Desktop: added server "ac-${b.name}" with project ${ws(b)}`);
+  p.log.success(`OpenCode Desktop: added server "${serverName(b)}" with project ${ws(b)}`);
 }
 
 // Hands the terminal to OpenCode's own key prompt for each provider
@@ -77,8 +78,10 @@ export async function newWizard(f = {}) {
     : p.text({ message: 'Repository URL', placeholder: 'https://github.com/owner/repo.git', validate: v => (isGitUrl(v ?? '') ? undefined : 'Enter an https:// or git@ URL') }));
   if (!isGitUrl(src) && !existsSync(src)) throw new Error(`Folder not found: ${src}`);
 
+  const s = loadSettings(), px = v => (v ? `"${v}"` : 'none');
+  if (!f.yes) p.log.info(`Name prefixes: Docker container ${px(s.containerPrefix)}, OpenCode server ${px(s.serverPrefix)}, OpenCode project ${px(s.projectPrefix)}. Change with: agentcage settings`);
   const nameOk = v => (!/^[a-z0-9][a-z0-9-]*$/.test(v ?? '') ? 'Use lowercase letters, digits and -' : nameTaken(v) ? `A container named '${v}' already exists` : undefined);
-  const name = await pick(f.name, cleanName(src), () => ask(p.text({ message: 'Container name (the Docker container and the OpenCode server get the prefix "ac-")', initialValue: cleanName(src), validate: nameOk })));
+  const name = await pick(f.name, cleanName(src), () => ask(p.text({ message: 'Container name', initialValue: cleanName(src), validate: nameOk })));
   if (nameOk(name)) throw new Error(nameOk(name));
 
   // Git push access
@@ -132,12 +135,29 @@ export async function newWizard(f = {}) {
     process.exit(1);
   }
   if (providers.length) await providerFlow(b, providers);
+  if (oc) await setupProject(b).catch(e => p.log.warn(`Could not set the project name and color in OpenCode: ${e.message}`));
   if (oc) await registerFlow(b, !f.yes);
   if (ide !== 'none') { openIde(b, ide); p.log.success('Opening the IDE attached to the container'); }
   p.outro([
     `Container '${name}' is ready.`,
-    oc && `OpenCode Desktop: select "ac-${name}" and start a session. Only sessions on that server are isolated.`,
+    oc && `OpenCode Desktop: select "${serverName(b)}" and start a session. Only sessions on that server are isolated.`,
     tools.includes('claude-code') && `Claude Code: agentcage shell ${name}, then run claude to log in.`,
     `Shell: agentcage shell ${name}    IDE: agentcage open ${name}`,
   ].filter(Boolean).join('\n'));
+}
+
+// Edit user settings one at a time until Done. They apply to containers created afterwards.
+export async function settingsWizard() {
+  p.intro('agentcage · settings');
+  const s = loadSettings();
+  for (;;) {
+    const key = await ask(p.select({ message: 'Which setting? (applies to new containers)', options: [
+      ...Object.keys(DEFAULTS).map(k => ({ value: k, label: LABELS[k], hint: s[k] === '' ? 'none' : s[k] })), { value: '', label: 'Done' }] }));
+    if (!key) break;
+    s[key] = await ask(key === 'color'
+      ? p.select({ message: LABELS.color, initialValue: s.color, options: COLORS.map(c => ({ value: c, label: c, hint: c === 'gray' ? "OpenCode's default" : undefined })) })
+      : p.text({ message: `${LABELS[key]} (empty for none)`, initialValue: s[key], defaultValue: '', validate: v => (/^[a-z0-9-]*$/.test(v ?? '') ? undefined : 'Use lowercase letters, digits and -') }));
+    saveSettings(s);
+  }
+  p.outro('Settings saved.');
 }

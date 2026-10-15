@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { parseArgs } from 'node:util';
 import * as p from '@clack/prompts';
 import { adoptContainer, listContainers, loadContainer, removeContainer, saveContainer, state, up, writeDevcontainer, openIde, ws } from '../src/container.js';
-import { ask, connectionInfo, newWizard, providerFlow, registerFlow } from '../src/wizard.js';
+import { ask, connectionInfo, newWizard, providerFlow, registerFlow, settingsWizard } from '../src/wizard.js';
 import { detectDesktop, latestVersion } from '../src/opencode.js';
 import { ok, run } from '../src/run.js';
 
@@ -23,9 +23,11 @@ const HELP = `agentcage: isolated dev containers for AI coding agents
   agentcage provider <name>         add model provider API keys to OpenCode in the container
   agentcage upgrade <name>          rebuild with the Desktop app's OpenCode version (volumes kept)
   agentcage remove <name>           delete container, volumes and config
-  agentcage version                 installed version, and the latest on npm (update: npm i -g agentcage@latest)
+  agentcage settings                project color and name prefixes for new containers
+  agentcage version | -v            installed version, and the latest on npm (update: npm i -g agentcage@latest)
   agentcage doctor                  check Docker, Node and OpenCode Desktop
   agentcage adopt <name>            import a container made by the old devbox bash scripts
+  agentcage help | -h               this help
 
   In token mode, a token can also be passed in the AGENTCAGE_GIT_TOKEN environment variable.`;
 
@@ -49,6 +51,7 @@ async function start(b) {
 }
 
 const commands = {
+  settings: settingsWizard,
   async version() {
     const v = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')).version;
     const latest = await fetch('https://registry.npmjs.org/agentcage/latest').then(r => r.json()).then(j => j.version, () => undefined);
@@ -103,7 +106,10 @@ const commands = {
     const containers = listContainers();
     if (!containers.length) return newWizard();
     p.intro('agentcage');
-    const pick = await ask(p.select({ message: 'What do you want to do?', options: [{ value: '', label: 'Create a new container' }, ...containers.map(b => ({ value: b.name, label: b.name, hint: state(b) }))] }));
+    // '-settings' can't clash with a container name (names start with a letter or digit)
+    const pick = await ask(p.select({ message: 'What do you want to do?', options: [{ value: '', label: 'Create a new container' },
+      ...containers.map(b => ({ value: b.name, label: b.name, hint: state(b) })), { value: '-settings', label: 'Settings' }] }));
+    if (pick === '-settings') return settingsWizard();
     if (!pick) return newWizard();
     const action = await ask(p.select({ message: pick, options: [
       { value: 'start', label: 'Start and show connection details' }, { value: 'open', label: 'Open in IDE' },

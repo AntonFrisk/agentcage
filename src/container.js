@@ -7,6 +7,7 @@ import { randomBytes } from 'node:crypto';
 import { createServer } from 'node:net';
 import { devcontainer, launch, ok, run, runSync } from './run.js';
 import { TOOLS } from './catalog.js';
+import { loadSettings } from './settings.js';
 import { copyIdentity, isGitUrl, parseRemote, seed, setupToken } from './git.js';
 
 export const ROOT = join(homedir(), '.agentcage');
@@ -32,7 +33,10 @@ export const listContainers = () => (existsSync(ROOT) ? readdirSync(ROOT).filter
 
 export const cleanName = s => s.replace(/\.git\/?$/, '').replace(/[\\/:]+$/, '').replace(/.*[:\\/]/, '')
   .toLowerCase().replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '');
-export const nameTaken = n => hasContainer(n) || ok('docker', ['inspect', `ac-${n}`]) || ok('docker', ['volume', 'inspect', `ac-${n}-src`]);
+export function nameTaken(n) {
+  const px = loadSettings().containerPrefix;
+  return hasContainer(n) || ok('docker', ['inspect', px + n]) || ok('docker', ['volume', 'inspect', `${px}${n}-src`]);
+}
 
 const bindable = port => new Promise(r => {
   const s = createServer().once('error', () => r(false)).listen(port, '127.0.0.1', () => s.close(() => r(true)));
@@ -72,10 +76,10 @@ export const state = b => runSync('docker', ['inspect', '-f', '{{.State.Status}}
 
 // o: { src, name, tools, git: 'token'|'forward'|'none', token, opencodeVersion }. step(label, fn) shows progress.
 export async function createContainer(o, step = (_, f) => f()) {
-  const { name } = o, src = isGitUrl(o.src) ? o.src : resolve(o.src);
+  const { name } = o, src = isGitUrl(o.src) ? o.src : resolve(o.src), s = loadSettings(), px = s.containerPrefix;
   const b = {
-    name, dir: join(ROOT, name), container: `ac-${name}`,
-    volumes: { src: `ac-${name}-src`, home: `ac-${name}-home` },
+    name, dir: join(ROOT, name), container: px + name, serverName: s.serverPrefix + name, projectName: s.projectPrefix + name, color: s.color,
+    volumes: { src: `${px}${name}-src`, home: `${px}${name}-home` },
     port: await freePort(), password: randomBytes(16).toString('hex'),
     source: src, git: o.git, tools: o.tools, opencodeVersion: o.opencodeVersion, created: new Date().toISOString(),
   };

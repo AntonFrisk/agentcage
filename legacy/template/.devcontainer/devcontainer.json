@@ -3,14 +3,14 @@
   // The container gets no host paths, no Docker socket and no privileged mode.
   "name": "${localWorkspaceFolderBasename}",
   "build": { "dockerfile": "Dockerfile" },
-  "workspaceMount": "source=devbox-${localWorkspaceFolderBasename}-src,target=/workspaces/${localWorkspaceFolderBasename},type=volume",
+  "workspaceMount": "source=ac-${localWorkspaceFolderBasename}-src,target=/workspaces/${localWorkspaceFolderBasename},type=volume",
   "workspaceFolder": "/workspaces/${localWorkspaceFolderBasename}",
   "mounts": [
     // Persists OpenCode logins/sessions, shell history etc. across rebuilds
-    "source=devbox-${localWorkspaceFolderBasename}-home,target=/home/node,type=volume"
+    "source=ac-${localWorkspaceFolderBasename}-home,target=/home/node,type=volume"
   ],
   // OpenCode server is published on the host's loopback only (__PORT__/__PASSWORD__ filled in by new-devbox.sh)
-  "runArgs": ["--name=devbox-${localWorkspaceFolderBasename}", "--label=devbox.name=${localWorkspaceFolderBasename}", "-p", "127.0.0.1:__PORT__:4096"],
+  "runArgs": ["--name=ac-${localWorkspaceFolderBasename}", "--label=agentcage.name=${localWorkspaceFolderBasename}", "-p", "127.0.0.1:__PORT__:4096"],
   "containerEnv": { "OPENCODE_SERVER_PASSWORD": "__PASSWORD__" },
   "remoteUser": "node",
   "init": true,

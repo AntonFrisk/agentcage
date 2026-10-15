@@ -6,7 +6,7 @@ set -euo pipefail
 export MSYS_NO_PATHCONV=1   # stop Git Bash from mangling container paths
 SRC=${1:?usage: new-devbox.sh <folder|git-url> [name]}
 NAME=${2:-$(basename "${SRC%.git}")}
-BOX=~/devboxes/$NAME VOL=devbox-$NAME-src
+BOX=~/devboxes/$NAME VOL=ac-$NAME-src
 winpath() { command -v cygpath >/dev/null && cygpath -w "$1" || echo "$1"; }
 
 docker volume inspect "$VOL" &>/dev/null && { echo "Volume $VOL exists. Run: ./remove-devbox.sh $NAME"; exit 1; }
@@ -26,5 +26,5 @@ fi
 docker run --rm -v "$VOL:/dst" alpine chown -R 1000:1000 /dst
 
 "$(dirname "$0")/start-devbox.sh" "$NAME"
-docker exec -u node "devbox-$NAME" sh -c "git config --global user.name \"$(git config --global user.name)\"; git config --global user.email \"$(git config --global user.email)\""
+docker exec -u node "ac-$NAME" sh -c "git config --global user.name \"$(git config --global user.name)\"; git config --global user.email \"$(git config --global user.email)\""
 "$(dirname "$0")/connect-devbox.sh" "$NAME" || true
