@@ -87,7 +87,7 @@ agentcage upgrade <name>        # rebuild with the Desktop app's OpenCode versio
 agentcage stop <name>
 agentcage remove <name>         # delete container, volumes and config
 agentcage version               # installed version and the latest on npm
-agentcage settings              # project color and name prefixes for new containers
+agentcage settings              # project color, name prefixes, clean up dead containers
 agentcage doctor
 agentcage adopt <name>          # import a container made by the old bash scripts in legacy/
 ```
@@ -106,6 +106,10 @@ created afterwards.
 | Docker container prefix | `ac-` | container and volume names, e.g. `ac-myproject`, `ac-myproject-src` |
 | OpenCode server prefix | `ac-` | the server's name in OpenCode Desktop |
 | OpenCode project prefix | `ac-` | the project's name in OpenCode (the folder stays `/workspaces/<name>`) |
+
+**Clean up dead containers** (also in Settings) lists leftovers of containers that no longer exist in Docker: agentcage
+configs and OpenCode Desktop servers. Stopped containers are kept. A config whose volumes still hold code is not
+preselected, because removing it deletes those volumes.
 
 ## Git push access
 
@@ -130,6 +134,12 @@ own git credentials, then copies the repo in. Both work with private repos. Your
 agentcage reads the Desktop app's version (from `opencode-cli.version` in its install folder) and installs the same OpenCode
 version in the container, because Desktop only talks to matching servers. `list`, `start` and `doctor` warn when the app has
 updated since; `agentcage upgrade <name>` rebuilds the container with the new version and keeps your code, logins and sessions.
+
+The OpenCode server is the container's main process, so it runs after every start: `agentcage start`, Docker Desktop, or an
+IDE starting the container. Containers made by older agentcage versions get this after one `agentcage upgrade <name>`.
+
+Cursor and VS Code open `/workspaces/<name>` however you attach (agentcage, Remote Explorer, Docker extension, recent list):
+agentcage sets the folder in the IDE's attached-container config for the container.
 
 Desktop has no API or deep link for adding a server, so agentcage writes the app's own state DB (`drafts.sqlite` in the
 app's data folder, backed up as `drafts.sqlite.agentcage-backup`). **The app must be closed for this.** The dialog asks you

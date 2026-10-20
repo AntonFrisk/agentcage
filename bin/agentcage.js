@@ -23,7 +23,7 @@ const HELP = `agentcage: isolated dev containers for AI coding agents
   agentcage provider <name>         add model provider API keys to OpenCode in the container
   agentcage upgrade <name>          rebuild with the Desktop app's OpenCode version (volumes kept)
   agentcage remove <name>           delete container, volumes and config
-  agentcage settings                project color and name prefixes for new containers
+  agentcage settings                project color, name prefixes, clean up dead containers
   agentcage version | -v            installed version, and the latest on npm (update: npm i -g agentcage@latest)
   agentcage doctor                  check Docker, Node and OpenCode Desktop
   agentcage adopt <name>            import a container made by the old devbox bash scripts

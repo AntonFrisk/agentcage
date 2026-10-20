@@ -12,3 +12,8 @@ RUN if [ -n "$OPENCODE_VERSION" ]; then npm install -g @opencode/cli@${OPENCODE_
 
 COPY post-create.sh /usr/local/bin/agentcage-post-create
 RUN chmod +x /usr/local/bin/agentcage-post-create
+
+# Main process: starts the OpenCode server on every container start (devcontainer.json sets overrideCommand: false)
+COPY start.sh /usr/local/bin/agentcage-start
+RUN chmod +x /usr/local/bin/agentcage-start
+CMD ["agentcage-start"]

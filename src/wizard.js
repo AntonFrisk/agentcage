@@ -3,9 +3,9 @@ import * as p from '@clack/prompts';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { AGENTS, DEV_TOOLS, PROVIDERS, hostInfo } from './catalog.js';
-import { cleanName, createContainer, nameTaken, openIde, ws } from './container.js';
+import { cleanName, createContainer, listContainers, nameTaken, openIde, publishedPorts, removeContainer, state, ws } from './container.js';
 import { isGitUrl, localRemote, parseRemote } from './git.js';
-import { connectDesktop, desktopRunning, detectDesktop, latestVersion, loginProvider, serverName, setupProject } from './opencode.js';
+import { connectDesktop, desktopRunning, desktopServers, detectDesktop, latestVersion, loginProvider, removeDesktopServers, serverName, setupProject } from './opencode.js';
 import { ok, runSync } from './run.js';
 import { COLORS, DEFAULTS, LABELS, loadSettings, saveSettings } from './settings.js';
 
@@ -46,13 +46,37 @@ async function waitForDocker() {
 // Registers the container in OpenCode Desktop, asking the user to close the app if needed
 export async function registerFlow(b, interactive = true) {
   if (!detectDesktop().hasDb) return p.note(connectionInfo(b), 'OpenCode Desktop not found. Add this server by hand');
-  while (desktopRunning()) {
-    if (!interactive) return p.log.warn(`OpenCode Desktop is open. Close it, then run: agentcage connect ${b.name}`);
-    const go = await ask(p.confirm({ message: 'Close OpenCode Desktop so the container can be added to it.', active: 'It is closed now', inactive: 'Skip for now' }));
-    if (!go) return p.log.info(`Later: agentcage connect ${b.name}`);
-  }
+  if (!interactive && desktopRunning()) return p.log.warn(`OpenCode Desktop is open. Close it, then run: agentcage connect ${b.name}`);
+  if (!(await desktopClosed('Close OpenCode Desktop so the container can be added to it.'))) return p.log.info(`Later: agentcage connect ${b.name}`);
   await connectDesktop(b);
   p.log.success(`OpenCode Desktop: added server "${serverName(b)}" with project ${ws(b)}`);
+}
+
+// Desktop's state can only be written while the app is closed. Returns false if the user skips.
+async function desktopClosed(message) {
+  while (desktopRunning()) if (!(await ask(p.confirm({ message, active: 'It is closed now', inactive: 'Skip for now' })))) return false;
+  return true;
+}
+
+// Leftovers of containers that no longer exist in Docker: agentcage configs (with their volumes) and OpenCode Desktop servers.
+// Stopped containers still exist and are kept. Configs whose volumes still hold code are not preselected.
+export async function cleanupFlow() {
+  const ports = publishedPorts(), dead = listContainers().filter(b => state(b) === 'missing');
+  const servers = detectDesktop().hasDb ? (await desktopServers()).filter(x => !ports.has(x.port)) : [];
+  const hasCode = b => ok('docker', ['volume', 'inspect', b.volumes.src]);
+  const options = [
+    ...dead.map(b => ({ value: `c:${b.name}`, label: `agentcage config: ${b.name}`, hint: hasCode(b) ? 'also deletes its volumes and the code in them' : 'no volumes left' })),
+    ...servers.map(x => ({ value: `s:${x.url}`, label: `OpenCode Desktop server: ${x.name}`, hint: x.url })),
+  ];
+  if (!options.length) return p.log.success('Nothing to clean up: every agentcage config and OpenCode server has a Docker container.');
+  const picked = await ask(p.multiselect({ message: 'Remove leftovers of containers that no longer exist?', options, required: false,
+    initialValues: options.filter(o => !dead.some(b => o.value === `c:${b.name}` && hasCode(b))).map(o => o.value) }));
+  for (const b of dead.filter(b => picked.includes(`c:${b.name}`))) { await removeContainer(b); p.log.success(`Removed ${b.name}`); }
+  const urls = servers.filter(x => picked.includes(`s:${x.url}`)).map(x => x.url);
+  if (!urls.length) return;
+  if (!(await desktopClosed('Close OpenCode Desktop so its servers can be removed.'))) return p.log.info('OpenCode Desktop servers were not removed.');
+  await removeDesktopServers(urls);
+  p.log.success(`Removed ${urls.length} server${urls.length > 1 ? 's' : ''} from OpenCode Desktop`);
 }
 
 // Hands the terminal to OpenCode's own key prompt for each provider
@@ -152,8 +176,10 @@ export async function settingsWizard() {
   const s = loadSettings();
   for (;;) {
     const key = await ask(p.select({ message: 'Which setting? (applies to new containers)', options: [
-      ...Object.keys(DEFAULTS).map(k => ({ value: k, label: LABELS[k], hint: s[k] === '' ? 'none' : s[k] })), { value: '', label: 'Done' }] }));
+      ...Object.keys(DEFAULTS).map(k => ({ value: k, label: LABELS[k], hint: s[k] === '' ? 'none' : s[k] })),
+      { value: '-cleanup', label: 'Clean up dead containers', hint: 'configs and OpenCode servers whose container is gone' }, { value: '', label: 'Done' }] }));
     if (!key) break;
+    if (key === '-cleanup') { await cleanupFlow(); continue; }
     s[key] = await ask(key === 'color'
       ? p.select({ message: LABELS.color, initialValue: s.color, options: COLORS.map(c => ({ value: c, label: c, hint: c === 'gray' ? "OpenCode's default" : undefined })) })
       : p.text({ message: `${LABELS[key]} (empty for none)`, initialValue: s[key], defaultValue: '', validate: v => (/^[a-z0-9-]*$/.test(v ?? '') ? undefined : 'Use lowercase letters, digits and -') }));

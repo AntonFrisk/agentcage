@@ -34,24 +34,49 @@ export const desktopRunning = () => P === 'win32'
 
 export const latestVersion = async () => (await (await fetch('https://registry.npmjs.org/@opencode/cli/latest')).json()).version;
 
-// Desktop has no API or deep link for adding a server, so write its state DB (app must be closed). A backup is kept.
-export async function connectDesktop(container) {
+// Desktop has no API or deep link for adding a server, so edit its state DB (app must be closed). A backup is kept.
+const urlOf = x => (typeof x === 'string' ? x : x.http?.url ?? x.url);
+async function serverState(edit) {
   const { db, hasDb } = detectDesktop();
   if (!hasDb) throw new Error(`OpenCode Desktop state not found at ${db}. Open the app once first.`);
-  if (desktopRunning()) throw new Error('OpenCode Desktop is running. Close it first.');
-  copyFileSync(db, db + '.agentcage-backup');
+  if (edit && desktopRunning()) throw new Error('OpenCode Desktop is running. Close it first.');
   const { DatabaseSync } = await import('node:sqlite');
-  const d = new DatabaseSync(db), url = `http://127.0.0.1:${container.port}`, dir = `/workspaces/${container.name}`;
+  const d = new DatabaseSync(db, { readOnly: !edit });
   const row = d.prepare("select value from state where name='opencode.global.dat' and key='server'").get();
   const s = { list: [], hidden: {}, projects: {}, lastProject: {}, recentlyClosed: {}, ...(row && JSON.parse(row.value)) };
-  const urlOf = x => (typeof x === 'string' ? x : x.http?.url ?? x.url);
-  s.list = s.list.filter(x => urlOf(x) !== url).concat({ type: 'http', http: { url, password: container.password }, displayName: serverName(container) });
+  if (edit) {
+    copyFileSync(db, db + '.agentcage-backup');
+    edit(s, d);
+    d.prepare(`insert into state(name, key, value, updated_at) values ('opencode.global.dat', 'server', ?, ?)
+      on conflict(name, key) do update set value = excluded.value, updated_at = excluded.updated_at`).run(JSON.stringify(s), Date.now());
+  }
+  d.close();
+  return s;
+}
+
+export const connectDesktop = c => serverState(s => {
+  const url = `http://127.0.0.1:${c.port}`, dir = `/workspaces/${c.name}`;
+  s.list = s.list.filter(x => urlOf(x) !== url).concat({ type: 'http', http: { url, password: c.password }, displayName: serverName(c) });
   s.projects[url] = [{ worktree: dir, expanded: true }];
   s.lastProject[url] = dir;
-  d.prepare(`insert into state(name, key, value, updated_at) values ('opencode.global.dat', 'server', ?, ?)
-    on conflict(name, key) do update set value = excluded.value, updated_at = excluded.updated_at`).run(JSON.stringify(s), Date.now());
-  d.close();
-}
+});
+
+// Servers on this machine (127.0.0.1:<port>) registered in Desktop: [{ url, port, name }]
+export const desktopServers = async () => (await serverState()).list.map(x => ({ url: urlOf(x), name: x.displayName ?? urlOf(x) }))
+  .map(x => ({ ...x, port: +x.url?.match(/^https?:\/\/(?:127\.0\.0\.1|localhost):(\d+)/)?.[1] })).filter(x => x.port);
+
+// Removes servers with everything Desktop keeps per server URL (UI history such as tabs is left to the app)
+export const removeDesktopServers = urls => serverState((s, d) => {
+  s.list = s.list.filter(x => !urls.includes(urlOf(x)));
+  for (const k of ['hidden', 'projects', 'lastProject', 'recentlyClosed']) for (const u of urls) delete s[k][u];
+  const del = d.prepare("delete from state where name='opencode.global.dat' and key=?");
+  for (const u of urls) del.run(u);
+  const row = d.prepare("select value from state where name='opencode.global.dat' and key='home.servers'").get(), h = row && JSON.parse(row.value);
+  if (h?.collapsed) {
+    for (const u of urls) delete h.collapsed[u];
+    d.prepare("update state set value=? where name='opencode.global.dat' and key='home.servers'").run(JSON.stringify(h));
+  }
+});
 
 // Names stored at creation; containers made before the settings existed use the current settings
 export const serverName = c => c.serverName ?? loadSettings().serverPrefix + c.name;

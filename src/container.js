@@ -41,9 +41,14 @@ export function nameTaken(n) {
 const bindable = port => new Promise(r => {
   const s = createServer().once('error', () => r(false)).listen(port, '127.0.0.1', () => s.close(() => r(true)));
 });
+// Host ports published by any Docker container, running or stopped (docker ps shows none for stopped ones)
+export function publishedPorts() {
+  const ids = runSync('docker', ['ps', '-aq']).split('\n').filter(Boolean);
+  const out = ids.length ? runSync('docker', ['inspect', '-f', '{{json .HostConfig.PortBindings}}', ...ids]) : '';
+  return new Set([...out.matchAll(/"HostPort":"(\d+)"/g)].map(m => +m[1]));
+}
 async function freePort() {
-  const used = new Set(listContainers().map(b => b.port));
-  for (const m of runSync('docker', ['ps', '-a', '--format', '{{.Ports}}']).matchAll(/:(\d+)->/g)) used.add(+m[1]);
+  const used = new Set([...listContainers().map(b => b.port), ...publishedPorts()]);
   for (let p = 4100; ; p++) if (!used.has(p) && (await bindable(p))) return p;
 }
 
@@ -60,18 +65,21 @@ export function writeDevcontainer(b) {
     workspaceFolder: ws(b),
     mounts: [`source=${b.volumes.home},target=/home/node,type=volume`],
     runArgs: [`--name=${b.container}`, `--label=agentcage.name=${b.name}`, ...(oc ? ['-p', `127.0.0.1:${b.port}:4096`] : [])],
-    containerEnv: oc ? { OPENCODE_SERVER_PASSWORD: b.password } : {},
+    containerEnv: { AGENTCAGE_WORKSPACE: ws(b), ...(oc && { OPENCODE_SERVER_PASSWORD: b.password }) },
     features: Object.fromEntries(tools.filter(t => t.feature).map(t => [t.feature, {}])),
     remoteUser: 'node',
     init: true,
+    overrideCommand: false, // run the image's CMD (agentcage-start) on every start, not only on devcontainer up
     forwardPorts: [3000],
     postCreateCommand: 'agentcage-post-create',
-    ...(oc && { postStartCommand: 'setsid nohup opencode serve --hostname 0.0.0.0 --port 4096 > /tmp/opencode-serve.log 2>&1 &' }),
   };
   writeFileSync(join(dir, 'devcontainer.json'), JSON.stringify(cfg, null, 2) + '\n');
 }
 
-export const up = (b, rebuild) => devcontainer(['up', '--workspace-folder', b.dir, ...(rebuild ? ['--remove-existing-container'] : [])]);
+export async function up(b, rebuild) {
+  await devcontainer(['up', '--workspace-folder', b.dir, ...(rebuild ? ['--remove-existing-container'] : [])]);
+  pinIdeFolder(b);
+}
 export const state = b => runSync('docker', ['inspect', '-f', '{{.State.Status}}', b.container]) || 'missing';
 
 // o: { src, name, tools, git: 'token'|'forward'|'none', token, opencodeVersion }. step(label, fn) shows progress.
@@ -100,10 +108,35 @@ export async function removeContainer(b) {
   for (const v of Object.values(b.volumes)) await run('docker', ['volume', 'rm', v]).catch(() => {});
   rmSync(b.dir, { recursive: true, force: true });
   rmSync(join(ROOT, b.name), { recursive: true, force: true });
+  for (const d of ideConfigDirs()) rmSync(join(d, 'nameConfigs', `${b.container}.json`), { force: true });
+}
+
+// VS Code-based IDEs keep an attached-container config per container name (nameConfigs) and per image (imageConfigs).
+// Its workspaceFolder decides the folder that opens on any attach (Remote Explorer, Docker extension, recent list),
+// so point both at the code. Other keys in those files (e.g. extensions) are kept.
+const CONFIG_HOME = P => P === 'win32' ? process.env.APPDATA ?? '' : P === 'darwin' ? join(homedir(), 'Library', 'Application Support')
+  : process.env.XDG_CONFIG_HOME || join(homedir(), '.config');
+const ideConfigDirs = (root = CONFIG_HOME(process.platform)) => (existsSync(root) ? readdirSync(root) : [])
+  .map(app => join(root, app, 'User', 'globalStorage')).filter(existsSync)
+  .flatMap(gs => readdirSync(gs).filter(d => d.endsWith('remote-containers')).map(d => join(gs, d)));
+export function pinIdeFolder(b) {
+  const image = runSync('docker', ['inspect', '-f', '{{.Config.Image}}', b.container]);
+  for (const d of ideConfigDirs()) {
+    // image configs: only fix existing ones, they are shared by every container of that image
+    for (const f of [join(d, 'nameConfigs', `${b.container}.json`), ...(image ? [join(d, 'imageConfigs', `${image}.json`)].filter(existsSync) : [])]) {
+      try {
+        const cfg = existsSync(f) ? JSON.parse(readFileSync(f, 'utf8')) : {};
+        if (cfg.workspaceFolder === ws(b)) continue;
+        mkdirSync(join(f, '..'), { recursive: true });
+        writeFileSync(f, JSON.stringify({ ...cfg, workspaceFolder: ws(b) }, null, '\t'));
+      } catch {} // not plain JSON (hand-edited with comments): leave it alone
+    }
+  }
 }
 
 // Opens a VS Code-based IDE attached to the running container
 export function openIde(b, ide) {
+  pinIdeFolder(b);
   const hex = Buffer.from(JSON.stringify({ containerName: `/${b.container}` })).toString('hex');
   launch(ide, ['--folder-uri', `vscode-remote://attached-container+${hex}${ws(b)}`]);
 }
