@@ -106,6 +106,7 @@ created afterwards.
 | Docker container prefix | `ac-` | container and volume names, e.g. `ac-myproject`, `ac-myproject-src` |
 | OpenCode server prefix | `ac-` | the server's name in OpenCode Desktop |
 | OpenCode project prefix | `ac-` | the project's name in OpenCode (the folder stays `/workspaces/<name>`) |
+| Git token per project | `don't use` | `ask every time` asks token or forwarded credentials for each new container, `always use` always asks for a token. See [Git push access](#git-push-access) |
 
 **Clean up dead containers** (also in Settings) lists leftovers of containers that no longer exist in Docker: agentcage
 configs and OpenCode Desktop servers. Stopped containers are kept. A config whose volumes still hold code is not
@@ -113,7 +114,7 @@ preselected, because removing it deletes those volumes.
 
 ## Git push access
 
-The copy in the container is separate from your laptop's, so changes leave the container via **git push**. The dialog offers two ways:
+The copy in the container is separate from your laptop's, so changes leave the container via **git push**. There are two ways. By default no token is used and the dialog doesn't ask; the **Git token per project** setting changes that:
 
 - **A token for this repo only (recommended).** The dialog shows how to create one: a fine-grained GitHub token limited to
 the repo with *Contents: read and write*, a GitLab project access token, or a Bitbucket repository access token. The token

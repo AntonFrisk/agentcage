@@ -85,6 +85,7 @@ const commands = {
     b.opencodeVersion = v; writeDevcontainer(b);
     await up(b, true).then(() => s.stop(`Rebuilt with OpenCode ${v}`), e => { s.error('Rebuild failed'); throw e; });
     saveContainer(b);
+    if (b.tools.includes('opencode')) await setupProject(b).catch(e => p.log.warn(`Could not set the project name and icon in OpenCode: ${e.message}`));
   },
   async remove() {
     const b = container();

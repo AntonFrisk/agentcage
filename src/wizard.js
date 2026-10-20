@@ -7,7 +7,7 @@ import { cleanName, createContainer, listContainers, nameTaken, openIde, publish
 import { isGitUrl, localRemote, parseRemote } from './git.js';
 import { connectDesktop, desktopRunning, desktopServers, detectDesktop, latestVersion, loginProvider, removeDesktopServers, serverName, setupProject } from './opencode.js';
 import { ok, runSync } from './run.js';
-import { COLORS, DEFAULTS, LABELS, loadSettings, saveSettings } from './settings.js';
+import { CHOICES, DEFAULTS, LABELS, loadSettings, saveSettings } from './settings.js';
 
 export const ask = async q => {
   const v = await q;
@@ -112,13 +112,17 @@ export async function newWizard(f = {}) {
   const remoteUrl = isGitUrl(src) ? src : localRemote(src), remote = parseRemote(remoteUrl);
   let git = 'none', token;
   if (remote) {
-    git = await pick(f.git, 'forward', () => ask(p.select({ message: `How should the container push to ${remote.host}/${remote.path}?`, options: [
+    // The gitToken setting decides whether to ask (never / always skip the question); --git overrides it
+    const fixed = f.git ?? { never: 'forward', always: 'token' }[s.gitToken];
+    git = await pick(fixed, 'forward', () => ask(p.select({ message: `How should the container push to ${remote.host}/${remote.path}?`, options: [
       { value: 'token', label: 'A token for this repo only', hint: 'recommended: agents can only push here' },
       { value: 'forward', label: "Skip: use my IDE's forwarded credentials", hint: 'access to all your repos while the IDE is attached' },
     ] })));
     if (git === 'token') {
       p.note(hostInfo(remote.host).help(remote.path), 'Repo token');
       token = process.env.AGENTCAGE_GIT_TOKEN ?? await ask(p.password({ message: 'Paste the token', validate: v => (v ? undefined : 'Required') }));
+    } else if (fixed && !f.git) {
+      p.log.info(`Git push: your IDE's forwarded credentials, no repo token (change in: agentcage settings)`);
     } else if (!f.yes) {
       p.note(FORWARD_WARNING, 'Warning: cross-repo access');
       if (!(await ask(p.confirm({ message: 'Continue with forwarded credentials?', initialValue: false })))) return newWizard({ ...f, src, name });
@@ -176,12 +180,12 @@ export async function settingsWizard() {
   const s = loadSettings();
   for (;;) {
     const key = await ask(p.select({ message: 'Which setting? (applies to new containers)', options: [
-      ...Object.keys(DEFAULTS).map(k => ({ value: k, label: LABELS[k], hint: s[k] === '' ? 'none' : s[k] })),
+      ...Object.keys(DEFAULTS).map(k => ({ value: k, label: LABELS[k], hint: s[k] === '' ? 'none' : CHOICES[k]?.[s[k]] ?? s[k] })),
       { value: '-cleanup', label: 'Clean up dead containers', hint: 'configs and OpenCode servers whose container is gone' }, { value: '', label: 'Done' }] }));
     if (!key) break;
     if (key === '-cleanup') { await cleanupFlow(); continue; }
-    s[key] = await ask(key === 'color'
-      ? p.select({ message: LABELS.color, initialValue: s.color, options: COLORS.map(c => ({ value: c, label: c, hint: c === 'gray' ? "OpenCode's default" : undefined })) })
+    s[key] = await ask(CHOICES[key]
+      ? p.select({ message: LABELS[key], initialValue: s[key], options: Object.entries(CHOICES[key]).map(([value, label]) => ({ value, label })) })
       : p.text({ message: `${LABELS[key]} (empty for none)`, initialValue: s[key], defaultValue: '', validate: v => (/^[a-z0-9-]*$/.test(v ?? '') ? undefined : 'Use lowercase letters, digits and -') }));
     saveSettings(s);
   }
