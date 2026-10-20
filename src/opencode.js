@@ -2,6 +2,7 @@
 import { copyFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { projectIcon } from './icon.js';
 import { ok, run, runSync } from './run.js';
 import { loadSettings } from './settings.js';
 
@@ -55,7 +56,7 @@ export async function connectDesktop(container) {
 // Names stored at creation; containers made before the settings existed use the current settings
 export const serverName = c => c.serverName ?? loadSettings().serverPrefix + c.name;
 
-// Sets the project's name and icon color in the container's OpenCode server. Asking about the folder creates the project first.
+// Sets the project's name and its generated icon in the container's OpenCode server. Asking about the folder creates the project first.
 // The server starts in the background after `devcontainer up`, so retry for ~30 s.
 export async function setupProject(c) {
   const s = loadSettings(), name = c.projectName ?? s.projectPrefix + c.name, color = c.color ?? s.color;
@@ -66,7 +67,7 @@ export async function setupProject(c) {
     try {
       await api(`/vcs?location[directory]=${encodeURIComponent(dir)}`);
       const { id } = (await api('/project')).find(x => x.canonical === dir);
-      return await api(`/project/${id}`, { method: 'PATCH', body: JSON.stringify({ name, icon: { color } }) });
+      return await api(`/project/${id}`, { method: 'PATCH', body: JSON.stringify({ name, icon: { color, override: projectIcon(c.name, s.projectPrefix) } }) });
     } catch (e) { if (i >= 15) throw e; await new Promise(r => setTimeout(r, 2000)); }
   }
 }

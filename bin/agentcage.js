@@ -4,7 +4,7 @@ import { parseArgs } from 'node:util';
 import * as p from '@clack/prompts';
 import { adoptContainer, listContainers, loadContainer, removeContainer, saveContainer, state, up, writeDevcontainer, openIde, ws } from '../src/container.js';
 import { ask, connectionInfo, newWizard, providerFlow, registerFlow, settingsWizard } from '../src/wizard.js';
-import { detectDesktop, latestVersion } from '../src/opencode.js';
+import { detectDesktop, latestVersion, setupProject } from '../src/opencode.js';
 import { ok, run } from '../src/run.js';
 
 process.removeAllListeners('warning'); // hide node:sqlite ExperimentalWarning
@@ -19,7 +19,7 @@ const HELP = `agentcage: isolated dev containers for AI coding agents
   agentcage stop <name>
   agentcage shell <name>            shell in the container (run opencode, claude, git ... here)
   agentcage open <name> [ide]       open Cursor (default), VS Code or another VS Code-based IDE attached to the container
-  agentcage connect <name>          (re)register the container in OpenCode Desktop (app must be closed)
+  agentcage connect <name>          (re)register the container in OpenCode Desktop and refresh its project icon (app must be closed)
   agentcage provider <name>         add model provider API keys to OpenCode in the container
   agentcage upgrade <name>          rebuild with the Desktop app's OpenCode version (volumes kept)
   agentcage remove <name>           delete container, volumes and config
@@ -73,7 +73,11 @@ const commands = {
     const b = container(); await start(b); openIde(b, arg2 ?? f.ide ?? 'cursor');
     if (b.git === 'token') p.log.warn('The IDE forwards your SSH agent into the container. Turn it off in the IDE settings to keep pushes limited to the repo token (see README).');
   },
-  async connect() { await registerFlow(container()); },
+  async connect() {
+    const b = container();
+    await start(b).then(() => setupProject(b)).catch(e => p.log.warn(`Could not set the project name and icon in OpenCode: ${e.message}`));
+    await registerFlow(b);
+  },
   async provider() { const b = container(); await start(b); await providerFlow(b, csv(f.providers)); },
   async upgrade() {
     const b = container(), v = detectDesktop().version ?? await latestVersion();

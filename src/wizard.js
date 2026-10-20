@@ -135,7 +135,7 @@ export async function newWizard(f = {}) {
     process.exit(1);
   }
   if (providers.length) await providerFlow(b, providers);
-  if (oc) await setupProject(b).catch(e => p.log.warn(`Could not set the project name and color in OpenCode: ${e.message}`));
+  if (oc) await setupProject(b).catch(e => p.log.warn(`Could not set the project name and icon in OpenCode: ${e.message}`));
   if (oc) await registerFlow(b, !f.yes);
   if (ide !== 'none') { openIde(b, ide); p.log.success('Opening the IDE attached to the container'); }
   p.outro([

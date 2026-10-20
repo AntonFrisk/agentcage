@@ -60,8 +60,9 @@ Run `agentcage` .  The wizard will ask you for this:
   API key in your terminal. Additional Providers can be added later. 
 7. **An IDE** to open the container in when it's ready (Cursor, VS Code, Antigravity).
 
-Then it builds the container, adds it to OpenCode Desktop as server **ac-&lt;name&gt;** (a green project) with the project
-`/workspaces/<name>` already open, and opens the IDE.
+Then it builds the container, adds it to OpenCode Desktop as server **ac-&lt;name&gt;** (a green project with a generated
+128x128 icon: `ac` in small letters over the first three letters of the name) with the project `/workspaces/<name>` already
+open, and opens the IDE.
 
 The same works without the dialog:
 
@@ -81,7 +82,7 @@ agentcage start <name>          # start after a reboot, print the OpenCode serve
 agentcage shell <name>          # shell in the container (opencode, claude, git ... work here)
 agentcage open <name> [ide]     # Cursor (default), VS Code, or another VS Code-based IDE attached to the container
 agentcage provider <name>       # add model provider API keys to OpenCode in the container
-agentcage connect <name>        # (re)register the container in OpenCode Desktop
+agentcage connect <name>        # (re)register the container in OpenCode Desktop and refresh its project icon
 agentcage upgrade <name>        # rebuild with the Desktop app's OpenCode version (volumes kept)
 agentcage stop <name>
 agentcage remove <name>         # delete container, volumes and config
