@@ -1,11 +1,14 @@
 // Generates the 128x128 project icon for OpenCode: dark green background, white text in two rows —
-// the project prefix ("ac") in small letters on top, the first three letters of the container name below.
+// the project prefix ("ac") in small letters on top, the first three letters of the container name in capitals below —
+// and a light color band along the bottom, its hue picked from the name (looks random, stays the same per project).
 // A hand-rolled PNG encoder (zlib + CRC) with a 5x7 bitmap font keeps this dependency-free.
 import { deflateSync } from 'node:zlib';
 
 const SIZE = 128, SS = 4, BG = [20, 83, 45], FG = [255, 255, 255]; // SS: supersampling for smooth edges
 
-// 5x7 pixel font ('#' = ink); lowercase letters, digits and - cover all names and prefixes
+const BAND = 4; // bottom pixel rows in the accent color
+
+// 5x7 pixel font ('#' = ink); lowercase and capital letters, digits and - cover all names and prefixes
 const FONT = {
   a: ['.....', '.....', '.###.', '....#', '.####', '#...#', '.####'],
   b: ['#....', '#....', '####.', '#...#', '#...#', '#...#', '####.'],
@@ -44,6 +47,39 @@ const FONT = {
   8: ['.###.', '#...#', '#...#', '.###.', '#...#', '#...#', '.###.'],
   9: ['.###.', '#...#', '#...#', '.####', '....#', '....#', '.###.'],
   '-': ['.....', '.....', '.....', '.###.', '.....', '.....', '.....'],
+  A: ['.###.', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+  B: ['####.', '#...#', '#...#', '####.', '#...#', '#...#', '####.'],
+  C: ['.###.', '#...#', '#....', '#....', '#....', '#...#', '.###.'],
+  D: ['####.', '#...#', '#...#', '#...#', '#...#', '#...#', '####.'],
+  E: ['#####', '#....', '#....', '####.', '#....', '#....', '#####'],
+  F: ['#####', '#....', '#....', '####.', '#....', '#....', '#....'],
+  G: ['.###.', '#...#', '#....', '#.###', '#...#', '#...#', '.####'],
+  H: ['#...#', '#...#', '#...#', '#####', '#...#', '#...#', '#...#'],
+  I: ['.###.', '..#..', '..#..', '..#..', '..#..', '..#..', '.###.'],
+  J: ['..###', '...#.', '...#.', '...#.', '...#.', '#..#.', '.##..'],
+  K: ['#...#', '#..#.', '#.#..', '##...', '#.#..', '#..#.', '#...#'],
+  L: ['#....', '#....', '#....', '#....', '#....', '#....', '#####'],
+  M: ['#...#', '##.##', '#.#.#', '#.#.#', '#...#', '#...#', '#...#'],
+  N: ['#...#', '#...#', '##..#', '#.#.#', '#..##', '#...#', '#...#'],
+  O: ['.###.', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+  P: ['####.', '#...#', '#...#', '####.', '#....', '#....', '#....'],
+  Q: ['.###.', '#...#', '#...#', '#...#', '#.#.#', '#..#.', '.##.#'],
+  R: ['####.', '#...#', '#...#', '####.', '#.#..', '#..#.', '#...#'],
+  S: ['.####', '#....', '#....', '.###.', '....#', '....#', '####.'],
+  T: ['#####', '..#..', '..#..', '..#..', '..#..', '..#..', '..#..'],
+  U: ['#...#', '#...#', '#...#', '#...#', '#...#', '#...#', '.###.'],
+  V: ['#...#', '#...#', '#...#', '#...#', '#...#', '.#.#.', '..#..'],
+  W: ['#...#', '#...#', '#...#', '#.#.#', '#.#.#', '#.#.#', '.#.#.'],
+  X: ['#...#', '#...#', '.#.#.', '..#..', '.#.#.', '#...#', '#...#'],
+  Y: ['#...#', '#...#', '.#.#.', '..#..', '..#..', '..#..', '..#..'],
+  Z: ['#####', '....#', '...#.', '..#..', '.#...', '#....', '#####'],
+};
+
+// Light accent color with a hue from the name, HSL(hue, 75%, 72%). Greens (hue 80-160) are skipped: no contrast with the background
+const accent = name => {
+  const h = (160 + [...name].reduce((n, ch) => (n * 31 + ch.charCodeAt(0)) >>> 0, 7) % 280) % 360, s = 0.75, l = 0.72;
+  const f = k => { const a = s * Math.min(l, 1 - l), t = (k + h / 30) % 12; return Math.round(255 * (l - a * Math.max(-1, Math.min(t - 3, 9 - t, 1)))); };
+  return [f(0), f(8), f(4)];
 };
 
 const crcTable = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; return c; });
@@ -76,10 +112,11 @@ const draw = (img, dim, text, s, y) => {
 // The icon as a data URL for OpenCode's project icon override
 export const projectIcon = (name, prefix = 'ac') => {
   const dim = SIZE * SS, img = Buffer.alloc(dim * dim * 3);
-  for (let i = 0; i < dim * dim; i++) { img[i * 3] = BG[0]; img[i * 3 + 1] = BG[1]; img[i * 3 + 2] = BG[2]; }
-  const rows = [[prefix.replace(/[^a-z0-9]/g, ''), 3], [name.slice(0, 3), 6]].filter(([t]) => t);
+  const band = accent(name);
+  for (let i = 0; i < dim * dim; i++) { const c = i >= dim * (SIZE - BAND) * SS ? band : BG; img[i * 3] = c[0]; img[i * 3 + 1] = c[1]; img[i * 3 + 2] = c[2]; }
+  const rows = [[prefix.replace(/[^a-z0-9]/g, ''), 3], [name.slice(0, 3).toUpperCase(), 6]].filter(([t]) => t);
   const gap = 12, total = rows.reduce((n, [, s]) => n + 7 * s, 0) + gap * (rows.length - 1);
-  let y = Math.round((SIZE - total) / 2);
+  let y = Math.round((SIZE - BAND - total) / 2) - 4; // centered above the band, then nudged up
   for (const [t, s] of rows) { draw(img, dim, t, s, y); y += 7 * s + gap; }
   const out = Buffer.alloc(SIZE * SIZE * 4); // downsample SS x SS blocks for smooth edges
   for (let py = 0; py < SIZE; py++) for (let px = 0; px < SIZE; px++) {
